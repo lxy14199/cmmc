@@ -4,15 +4,18 @@
 #include <string.h>
 
 #define int long long
-
-int token;
-char *src, *old_src;
+int token; //读入的token
+char *src, *old_src; //读入文件的源的指针
+//数据端，代码端，栈端
 int *text,
 	*old_text,
 	*stack;
 char *data;
+//
 int *pc, *bp, *sp, ax, cycle;
+//数据端，代码端，栈端的大小
 int poolsize;
+//读入在第几行
 int line;
 
 //指令集
@@ -20,15 +23,136 @@ enum {  LEA, IMM, JMP, CALL, JZ, JNZ, ENT, ADJ, LEV, LI, LC, SI, SC, PUSH,
 		OR, XOR, AND, EQ, NE, LT, GT, LE, GE, SHL, SHR, ADD, SUB, MUL, DIV, MOD,
 		OPEN, READ, CLOS, PRTF, MALC, MSET, MCMP, EXIT};
 
+//用来标识token, 便于词法分析
+enum {
+		Num = 128, Fun, Sys, Glo, Loc, Id, 
+		Char, Else, Enum, If, Int, Return, Sizeof, While, 
+		Assign, Cond, Lor, Lan, Or, Xor, And, Eq, Ne, Lt, Gt, Le, Ge, Shl, Shr, Add, Sub, Mul, Div, Mod, Inc, Brak
+};
+
+/*
+struct identifier {
+		int token;  //该标识符返回的标识
+		int hash;   //计算的hash值，便于查找
+		char *name; //存放名字
+		int class;  //标识符对应类别，如数字、全局变量
+		int type;   //标识符对应类型，int、char、ptr
+		int value;  //存放对应的值，如果是函数则存放函数地址
+		int Bclass; //用于区别局部变量和全局变量
+		int Btype;
+		int Bvalue;
+};
+*/
+enum {Token, Hash, Name, Type, Class, value, BType, BClass, BValue, IdSize};  //等价于定义了identifier结构体
+int token_value;
+int *current_id,
+	*symbols;
+
+
+//用于词法分析指向下一个字符
 void next() {
-		token = *src ++;
+		char *last_pos;
+		int hash;
+
+		while(token = *src) {
+				++ src;
+				//词法分析
+				if(token == '\n') {
+						++ line;
+				} else if (token == '#') {
+						//cmmc无法解析宏定义
+						while(*src != 0 && *src != '\n') {
+								src ++;
+						}
+				} else if ((token >= 'a' && token <= 'z') || (token >= 'A' && token <= 'Z') || (token == '_')) {
+						//分析定义的变量名
+						last_pos = src - 1;
+						hash = token;
+						
+						while((*src >= 'a' && *src <= 'z') || (*src >= 'A' && *src <= 'Z') || (*src >= '0' && *src <= '9') || (*src == '_')) {
+								hash = hash * 147 + *src;
+								src ++;
+						}
+						
+						current_id = symbols;
+						while(current_id[Token]) {
+								if (current_id[Hash] == hash && !memcmp((char *)current_id[Name], last_pos, src - last_pos)) {
+										token = current_id[Token];
+										return ;
+								}
+								current_id = current_id + IdSize;
+						}
+
+						current_id[Name] = (int)last_pos;
+						current_id[Hash] = hash;
+						token = current_id[Token] = Id;
+						return ;		
+				} else if (token >= '0' && token <= '9') {
+						//解析3种进制，16进制，10进制，8进制
+						token_value = token - '0';
+						if (token_value > '0') {
+								while(*src >= '0' && *src <= '9') {
+										token_value = token_value * 10 + *src++ - '0';
+								}
+						} else {
+								if(*src == 'x' || *src == 'X') {
+										token = *++src;
+										while((token >= '0' && token <= '9') || (token >= 'a' && token <= 'f') || (token >= 'A' && token <= 'F')) {
+												token_value = token_value * 16 + (token & 15) + (token >= 'A' ? 9 : 0);
+												token = ++src;
+										}
+								} else {
+										while(*src >= '0' && *src <= '7') {
+												token_value = token_value * 8 + *src ++ - '0';
+										}
+								}
+						}
+						token = Num;
+						return;
+				} else if(token == '"' || token == '\'') {
+						//解析字符串
+						last_pos = data;
+						while(*src != 0 && *src != token) {
+								token_value = *src ++;
+								if(token_value == '\\') {
+										token_value = *src ++;
+										if(token_value == 'n') {
+												token_value = '\n';
+										}		
+								}
+								if(token == '"') {
+										*data = token_value;
+								}
+						}
+						src ++;
+						if(token == '"') {
+								token_value = (int)last_pos;
+						} else {
+								token = Num;
+						}
+
+						return ;
+				} else if(token == '/') {
+						if (*src == '/') {
+								//跳过注释
+								while(*src != 0 && *src != '\n') {
+										++ src;
+								}
+						} else {
+								token = Div;
+								return;
+						}
+				}
+		}
+
 		return ;
 }
-
+//解析表达式
 void expression(int level) {
 
 }
 
+//语法分析入口
 void program() {
 		next();
 		while(token > 0) {
@@ -37,6 +161,7 @@ void program() {
 		}
 }
 
+//虚拟机入口，解释目标代码
 int eval() {
 		int op, *tmp;
 		while(1) {
