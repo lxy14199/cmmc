@@ -27,7 +27,7 @@ enum {  LEA, IMM, JMP, CALL, JZ, JNZ, ENT, ADJ, LEV, LI, LC, SI, SC, PUSH,
 enum {
 		Num = 128, Fun, Sys, Glo, Loc, Id, 
 		Char, Else, Enum, If, Int, Return, Sizeof, While, 
-		Assign, Cond, Lor, Lan, Or, Xor, And, Eq, Ne, Lt, Gt, Le, Ge, Shl, Shr, Add, Sub, Mul, Div, Mod, Inc, Brak
+		Assign, Cond, Lor, Lan, Or, Xor, And, Eq, Ne, Lt, Gt, Le, Ge, Shl, Shr, Add, Sub, Mul, Div, Mod, Inc,Dec, Brak
 };
 
 /*
@@ -53,7 +53,7 @@ int *current_id,
 void next() {
 		char *last_pos;
 		int hash;
-
+		
 		while(token = *src) {
 				++ src;
 				//词法分析
@@ -142,6 +142,92 @@ void next() {
 								token = Div;
 								return;
 						}
+				} else if(token == '=') {
+						if (*src == '=') {
+								src ++;
+								token = Eq;
+						} else {
+								token = Assign;
+						}
+						return ;
+				} else if(token == '+') {
+						if (*src == '+') {
+								src ++;
+								token = Inc;
+						} else {
+								token = Add;
+						}
+						return ;
+				} else if(token == '-') {
+						if(*src == '-') {
+								src ++;
+								token = Dec;
+						} else {
+								token = Sub;
+						}
+						return ;
+				} else if(token == '!') {
+						if(*src == '=') {
+								src ++;
+								token = Ne;
+						}
+						return ;
+				} else if(token == '<') {
+						if(*src == '=') {
+								src ++;
+								token = Le;
+						} else if(*src == '<') {
+								src ++;
+								token = Shl;
+						} else {
+								token = Lt;
+						}
+						return ;
+				} else if(token == '>') {
+						if(*src == '=') {
+								src ++;
+								token = Ge;
+						} else if(*src == '>') {
+								src ++;
+								token = Shr;
+						} else {
+								token = Gt;
+						}
+						return ;
+				} else if (token == '|') {
+						if(*src == '|') {
+								src ++;
+								token = Lor;
+						} else {
+								token = Or;
+						}
+						return ;
+				} else if(token == '&') {
+						if(*src == '&') {
+								src ++;
+								token = Lan;
+						} else {
+								token = And;
+						}
+						return ;
+				} else if(token == '^') {
+						token = Xor;
+						return ;
+				} else if(token == '%') {
+						token = Mod;
+						return ;
+				} else if(token == '*') {
+						token = Mul;
+						return ;
+				} else if(token == '[') {
+						token = Brak;
+						return ;
+				} else if(token == '?') {
+						token = Cond;
+						return ;
+				} else if(token == '~' || token == ';' || token == '{' || token == '}' || token == '(' || token == ')' || token == ']' || token == ',' || token == ':') {
+
+						return ;
 				}
 		}
 
