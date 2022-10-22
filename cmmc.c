@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <memory.h>
 #include <string.h>
+#include <sys/types.h>
+#include <time.h>
 
 #define int long long
 int token; //读入的token
@@ -43,11 +45,16 @@ struct identifier {
 		int Bvalue;
 };
 */
-enum {Token, Hash, Name, Type, Class, value, BType, BClass, BValue, IdSize};  //等价于定义了identifier结构体
+enum {Token, Hash, Name, Type, Class, Value, BType, BClass, BValue, IdSize};  //等价于定义了identifier结构体
 int token_value;
 int *current_id,
 	*symbols;
+enum {CHAR, INT, PTR};
+//递归下降解析
+int basetype;  
+int expr_type;
 
+int index_of_bp;
 
 //用于词法分析指向下一个字符
 void next() {
@@ -238,12 +245,227 @@ void expression(int level) {
 
 }
 
+void mattch(int tk) {
+		if(token == tk) {
+				next();
+		} else {
+				printf("%d: expected token: %d\n", line, token);
+				exit(-1);
+		}
+}
+
+//enum解析
+void enum_declaration() {
+		int i;
+		i = 0;
+		while (token != '}') {
+				if(token != Id){
+						printf("%d: bad enum declaration\n", line);
+						exit(-1);
+				}
+
+				next();
+				if (token == 'Assign') {
+						next();
+						if (token != Num) {
+								printf("%d: bad enum num declaration\n", line);
+								exit(-1);
+						}
+						i = token_value;
+						next();
+				}
+
+				current_id[Class] = Num;
+				current_id[Type] = Int;
+				current_id[Value] = i ++;
+
+				if(token == ',') {
+						next();
+				}
+
+		}
+}
+
+//解析函数参数
+void function_parameter() {
+		int type;
+		int params;
+		params = 0;
+		while (token != ')') {
+				type = INT;
+				if (token == Int) {
+						mattch(Int);
+				} else if (token == Char) {
+						mattch(Char);
+				}
+
+				while (token == Mul) {
+						mattch(Mul);
+						type = type + PTR;
+				}
+				if (token != Id) {
+						printf("%d: bad parameter declaration\n", line);
+						exit(-1);
+												        
+				}
+				if (current_id[Class] == Loc) {
+						printf("%d: duplicate parameter declaration\n", line);
+						exit(-1);
+												        
+				}
+				
+				mattch(Id);
+				current_id[BClass] = current_id[Class]; current_id[Class] = Loc;
+				current_id[BType] = current_id[Type]; current_id[Type] = type;
+				current_id[BValue] = current_id[Value]; current_id[Value] = params ++;
+				
+				if (token == ',') {
+						mattch(',');
+				}	
+		}
+
+		index_of_bp = params + 1;
+}
+
+//解析各种语句
+void statement() {
+
+}
+
+//解析函数体
+void function_body() {
+		int pos_local;
+		int type;
+		pos_local = index_of_bp;
+
+		while (token == Int || token == Char) {
+				basetype = (token == Int) ? INT : CHAR;
+				mattch(token);
+				
+				while (token != ';') {
+						type = basetype;
+						while (token == Mul) {
+								mattch(Mul);
+								type = type + PTR;
+						}
+						if (token != Id) {
+								printf("%d: bad parameter declaration\n", line);
+								exit(-1);					        
+						}
+						if (current_id[Class] == Loc) {
+								printf("%d: duplicate parameter declaration\n", line);
+								exit(-1);						        
+						}
+						mattch(Id);
+						current_id[BClass] = current_id[Class]; current_id[Class] = Loc;
+						current_id[BType] = current_id[Type]; current_id[Type] = type;
+						current_id[BValue] = current_id[Value]; current_id[Value] = ++ pos_local;
+				
+						if (token == ',') {
+								mattch(',');
+						}
+				}
+				mattch(';');
+		}
+
+		*++text = ENT;
+		*++text = pos_local - index_of_bp;
+
+		while (token != '}') {
+				statement();
+		}
+
+		*++text = LEV;
+}
+
+void function_declaration() {
+		mattch('(');
+		function_parameter();
+		mattch(')');
+
+		mattch('{');
+		function_body();
+
+		current_id = symbols;
+		while (current_id[Token]) {
+				if (current_id[Class] == Loc) {
+						current_id[Class] = current_id[BClass];
+						current_id[Type] = current_id[BType];
+						current_id[Value] = current_id[BValue];
+				}
+				current_id = current_id + IdSize;
+		}
+}
+
+//解析全局变量，enum，函数
+void global_declaration() {
+		int type;
+		int i;
+
+		basetype = INT;
+
+		if (token == Enum) {
+				mattch(Enum);
+				if(token != '{') {
+						mattch(Id);
+				} 
+				if(token == '{') {
+						mattch('{');
+						enum_declaration();
+						mattch('}');
+				}
+
+				mattch(';');
+				return ;
+		} 
+		
+		if(token == Int) {
+				mattch(Int);
+		} else if(token == Char) {
+				mattch(Char);
+				basetype = CHAR;
+		} 
+		
+		while (token != ';' && token != '}') {
+				type = basetype;
+				while (token == 'Mul') {
+						mattch(Mul);
+						type = type + PTR;
+				}
+				if(token != Id) {
+						printf("%d: bad global declaration!\n", line);
+						exit(-1);
+				}
+				if(current_id[Class]) {
+						printf("%d: duplicate global declaration\n", line);
+						exit(-1);
+				}
+				mattch(Id);
+				current_id[Type] = type;
+				
+				if(token == '(') {
+						current_id[Class] = Fun;
+						current_id[Value] = (int)(text + 1);
+						function_declaration();
+				} else {
+						current_id[Class] = Glo;
+						current_id[Value] = (int)data;
+						data = data + sizeof(int);
+				}
+
+				if(token == ',') {
+						mattch(',');
+				}
+		}
+		next();
+}
+
+
 //语法分析入口
 void program() {
 		next();
 		while(token > 0) {
-				printf("token is: %c\n", token);
-				next();
+				global_declaration();
 		}
 }
 
