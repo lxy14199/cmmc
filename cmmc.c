@@ -26,25 +26,12 @@ enum {  LEA, IMM, JMP, CALL, JZ, JNZ, ENT, ADJ, LEV, LI, LC, SI, SC, PUSH,
 		OPEN, READ, CLOS, PRTF, MALC, MSET, MCMP, EXIT};
 
 //用来标识token, 便于词法分析
-enum {
-		Num = 128, Fun, Sys, Glo, Loc, Id, 
+enum {  Num = 128, Fun, Sys, Glo, Loc, Id, 
 		Char, Else, Enum, If, Int, Return, Sizeof, While, 
 		Assign, Cond, Lor, Lan, Or, Xor, And, Eq, Ne, Lt, Gt, Le, Ge, Shl, Shr, Add, Sub, Mul, Div, Mod, Inc,Dec, Brak
 };
 
-/*
-struct identifier {
-		int token;  //该标识符返回的标识
-		int hash;   //计算的hash值，便于查找
-		char *name; //存放名字
-		int class;  //标识符对应类别，如数字、全局变量
-		int type;   //标识符对应类型，int、char、ptr
-		int value;  //存放对应的值，如果是函数则存放函数地址
-		int Bclass; //用于区别局部变量和全局变量
-		int Btype;
-		int Bvalue;
-};
-*/
+//结构体
 enum {Token, Hash, Name, Type, Class, Value, BType, BClass, BValue, IdSize};  //等价于定义了identifier结构体
 int token_value;
 int *current_id,
@@ -53,14 +40,13 @@ enum {CHAR, INT, PTR};
 //递归下降解析
 int basetype;  
 int expr_type;
-
+int *idmain;
 int index_of_bp;
 
 //用于词法分析指向下一个字符
 void next() {
 		char *last_pos;
 		int hash;
-		
 		while(token = *src) {
 				++ src;
 				//词法分析
@@ -75,12 +61,13 @@ void next() {
 						//分析定义的变量名
 						last_pos = src - 1;
 						hash = token;
-						
+						printf("%c", *last_pos);	
 						while((*src >= 'a' && *src <= 'z') || (*src >= 'A' && *src <= 'Z') || (*src >= '0' && *src <= '9') || (*src == '_')) {
 								hash = hash * 147 + *src;
+								printf("%c", *src);
 								src ++;
 						}
-						
+						printf("\n");
 						current_id = symbols;
 						while(current_id[Token]) {
 								if (current_id[Hash] == hash && !memcmp((char *)current_id[Name], last_pos, src - last_pos)) {
@@ -89,7 +76,6 @@ void next() {
 								}
 								current_id = current_id + IdSize;
 						}
-
 						current_id[Name] = (int)last_pos;
 						current_id[Hash] = hash;
 						token = current_id[Token] = Id;
@@ -97,7 +83,7 @@ void next() {
 				} else if (token >= '0' && token <= '9') {
 						//解析3种进制，16进制，10进制，8进制
 						token_value = token - '0';
-						if (token_value > '0') {
+						if (token_value > 0) {
 								while(*src >= '0' && *src <= '9') {
 										token_value = token_value * 10 + *src++ - '0';
 								}
@@ -141,134 +127,549 @@ void next() {
 						return ;
 				} else if(token == '/') {
 						if (*src == '/') {
-								//跳过注释
-								while(*src != 0 && *src != '\n') {
-										++ src;
+										//跳过注释
+										while(*src != 0 && *src != '\n') {
+												++ src;
+										}
+								} else {
+										token = Div;
+										return;
 								}
-						} else {
-								token = Div;
-								return;
-						}
-				} else if(token == '=') {
-						if (*src == '=') {
-								src ++;
-								token = Eq;
-						} else {
-								token = Assign;
-						}
-						return ;
-				} else if(token == '+') {
-						if (*src == '+') {
-								src ++;
-								token = Inc;
-						} else {
-								token = Add;
-						}
-						return ;
-				} else if(token == '-') {
-						if(*src == '-') {
-								src ++;
-								token = Dec;
-						} else {
-								token = Sub;
-						}
-						return ;
-				} else if(token == '!') {
-						if(*src == '=') {
-								src ++;
-								token = Ne;
-						}
-						return ;
-				} else if(token == '<') {
-						if(*src == '=') {
-								src ++;
-								token = Le;
-						} else if(*src == '<') {
-								src ++;
-								token = Shl;
-						} else {
-								token = Lt;
-						}
-						return ;
-				} else if(token == '>') {
-						if(*src == '=') {
-								src ++;
-								token = Ge;
-						} else if(*src == '>') {
-								src ++;
-								token = Shr;
-						} else {
-								token = Gt;
-						}
-						return ;
-				} else if (token == '|') {
-						if(*src == '|') {
-								src ++;
-								token = Lor;
-						} else {
-								token = Or;
-						}
-						return ;
-				} else if(token == '&') {
-						if(*src == '&') {
-								src ++;
-								token = Lan;
-						} else {
-								token = And;
-						}
-						return ;
-				} else if(token == '^') {
-						token = Xor;
-						return ;
-				} else if(token == '%') {
-						token = Mod;
-						return ;
-				} else if(token == '*') {
-						token = Mul;
-						return ;
-				} else if(token == '[') {
-						token = Brak;
-						return ;
-				} else if(token == '?') {
-						token = Cond;
-						return ;
-				} else if(token == '~' || token == ';' || token == '{' || token == '}' || token == '(' || token == ')' || token == ']' || token == ',' || token == ':') {
+						} else if(token == '=') {
+								if (*src == '=') {
+										src ++;
+										token = Eq;
+								} else {
+										token = Assign;
+								}
+								return ;
+						} else if(token == '+') {
+								if (*src == '+') {
+										src ++;
+										token = Inc;
+								} else {
+										token = Add;
+								}
+								return ;
+						} else if(token == '-') {
+								if(*src == '-') {
+										src ++;
+										token = Dec;
+								} else {
+										token = Sub;
+								}
+								return ;
+						} else if(token == '!') {
+								if(*src == '=') {
+										src ++;
+										token = Ne;
+								}
+								return ;
+						} else if(token == '<') {
+								if(*src == '=') {
+										src ++;
+										token = Le;
+								} else if(*src == '<') {
+										src ++;
+										token = Shl;
+								} else {
+										token = Lt;
+								}
+								return ;
+						} else if(token == '>') {
+								if(*src == '=') {
+										src ++;
+										token = Ge;
+								} else if(*src == '>') {
+										src ++;
+										token = Shr;
+								} else {
+										token = Gt;
+								}
+								return ;
+						} else if (token == '|') {
+								if(*src == '|') {
+										src ++;
+										token = Lor;
+								} else {
+										token = Or;
+								}
+								return ;
+						} else if(token == '&') {
+								if(*src == '&') {
+										src ++;
+										token = Lan;
+								} else {
+										token = And;
+								}
+								return ;
+						} else if(token == '^') {
+								token = Xor;
+								return ;
+						} else if(token == '%') {
+								token = Mod;
+								return ;
+						} else if(token == '*') {
+								token = Mul;
+								return ;
+						} else if(token == '[') {
+								token = Brak;
+								return ;
+						} else if(token == '?') {
+								token = Cond;
+								return ;
+						} else if(token == '~' || token == ';' || token == '{' || token == '}' || token == '(' || token == ')' || token == ']' || token == ',' || token == ':') {
 
-						return ;
+								return ;
+						}
 				}
+
+				return ;
 		}
 
-		return ;
-}
-//解析表达式
-void expression(int level) {
 
-}
-
-void mattch(int tk) {
-		if(token == tk) {
-				next();
-		} else {
-				printf("%d: expected token: %d\n", line, token);
-				exit(-1);
-		}
-}
-
-//enum解析
-void enum_declaration() {
-		int i;
-		i = 0;
-		while (token != '}') {
-				if(token != Id){
-						printf("%d: bad enum declaration\n", line);
+		void mattch(int tk) {
+				if(token == tk) {
+						next();
+				} else {
+						printf("%d: expected token: %d\n", line, token);
 						exit(-1);
 				}
+		}
 
-				next();
-				if (token == 'Assign') {
+		//解析表达式
+		void expression(int level) {
+				int *id;
+				int tmp;
+				int *addr;
+
+				{
+						if(token == Num) {
+								mattch(Num);
+								*++text = IMM;
+								*++text = token_value;
+								expr_type = INT;
+						} else if(token == '"') {
+								*++text = IMM;
+								*++text = token_value;
+
+								mattch('"');
+
+								while (token == '"') {
+										mattch('"');
+								}
+
+								data = (char *)(((int)data + sizeof(int)) & (-sizeof(int)));
+								expr_type = PTR;
+						} else if (token == Sizeof) {
+								mattch(Sizeof);
+								mattch('(');
+
+								if(token == Int){
+										mattch(Int);
+								} else if (token == Char) {
+										mattch(Char);
+										expr_type = CHAR;
+								} 
+
+								while (token == Mul) {
+										mattch(Mul);
+										expr_type = expr_type + PTR;
+								}
+
+								mattch(')');
+
+								*++text = IMM;
+								*++text = (expr_type == CHAR) ? sizeof(char) : sizeof(int);
+
+								expr_type = INT;
+						} else if(token == Id) {
+								mattch(Id);
+
+								id = current_id;
+
+								if (token == '(') {
+										mattch('(');
+
+										tmp = 0;
+										while (token != ')') {
+												expression(Assign);
+												*++text = PUSH;
+												tmp ++;
+
+												if(token == ',') {
+														mattch(',');
+												}
+										}
+
+										mattch(')');
+
+										if(id[Class] == Sys) {
+												*++text = id[Value];
+										} else if (id[Class] == Fun) {
+												*++text = CALL;
+												*++text = id[Value];
+										} else {
+												printf("%d: bad function call\n", line);
+												exit(-1);
+										}
+
+										if(tmp > 0) {
+												*++text = ADJ;
+												*++text = tmp;
+										}
+										expr_type = id[Type];
+								} else if(id[Class] == Num) {
+										*++text = IMM;
+										*++text = id[Value];
+										expr_type = INT;
+								} else {
+										if(id[Class] == Loc) {
+												*++text = LEA;
+												*++text = index_of_bp - id[Value];
+										} else if(id[Class] == Glo) {
+												*++text = IMM;
+												*++text = id[Value];
+										} else {
+												printf("%d: undefined variable\n", line);
+												exit(-1);
+										}
+
+										expr_type = id[Type];
+										*++text = (expr_type == Char) ? LC : LI;
+								}
+						} else if(token == '(') {
+								mattch('(');
+								if(token == Int || token == Char) {
+										tmp = (token == Char) ? CHAR : INT;
+										mattch(token);
+										
+										while (token == Mul) {
+												mattch(Mul);
+												tmp = tmp + PTR;
+										}
+
+										mattch(')');
+
+										expression(Inc);
+
+										expr_type = tmp;
+								}
+						} else if(token == Mul) {
+								mattch(Mul);
+								expression(Inc);
+
+								if(expr_type >= PTR) {
+										expr_type = expr_type - PTR; 
+								} else {
+										printf("%d: bad derefreence\n", line);
+										exit(-1);
+								}
+
+								*++text = (expr_type == CHAR) ? LC : LI;
+						} else if(token == And) {
+								mattch(And);
+								expression(Inc);
+								if(*text == LC || *text == LI) {
+										text --;
+								} else {
+										printf("%d: bad address of\n", line);
+										exit(-1);
+								}
+
+								expr_type = expr_type + PTR;
+						} else if(token == '!') {
+								mattch('!');
+								expression(Inc);
+
+								*++text = PUSH;
+								*++text = IMM;
+								*++text = 0;
+								*++text = EQ;
+
+								expr_type = INT;
+						} else if(token == '~') {
+								mattch('~');
+								expression(Inc);
+
+								*++text = PUSH;
+								*++text = IMM;
+								*++text = XOR;
+
+								expr_type = INT;
+						} else if(token == Add) {
+								mattch(Add);
+								expression(Inc);
+
+								expr_type = INT;
+						} else if(token == Sub) {
+								mattch(Sub);
+
+								if(token == Num) {
+										*++text = IMM;
+										*++text = -token_value;
+										mattch(Num);
+								} else {
+										*++text = IMM;
+										*++text = -1;
+										*++text = PUSH;
+										expression(Inc);
+										*++text = MUL;
+								}
+
+								expr_type = INT;
+						} else if(token == Inc || token == Dec) {
+								tmp = token;
+								mattch(token);
+								expression(Inc);
+
+								if(*text == LC) {
+										*text = PUSH;
+										*++text = LC;
+								} else if(*text == LI) {
+										*text = PUSH;
+										*++text = LI;
+								} else {
+										printf("%d: bad lvalue of pre-increment\n", line);
+										exit(-1);
+								}
+
+								*++text = PUSH;
+								*++text = IMM;
+
+								*++text = (expr_type > PTR) ? sizeof(int) : sizeof(char);
+								*++text = (tmp == Inc) ? Add : Sub;
+								*++text = (expr_type == CHAR) ? SC : SI;
+						} 
+				}
+
+				{
+						while (token >= level) {
+								tmp = expr_type;
+								if(token == Assign) {
+										mattch(Assign);
+										if (*text == LC || *text == LI) {
+												*text = PUSH;
+										} else {
+												printf("%d: bad lvalue in assignment!\n", line);
+												exit(-1);
+										}
+										expression(Assign);
+										expr_type = tmp;
+
+										*++text = (expr_type == CHAR) ? SC : SI;
+								} else if (token == Cond) {
+										mattch(Cond);
+										*++text = JZ;
+										addr = ++text;
+										expression(Assign);
+										if (token == ':') {
+												mattch(':');
+										} else {
+												printf("%d: missing colon in conditional\n", line);
+												exit(-1);
+										}
+										*addr = (int)(text + 3);
+										*++text = JMP;
+										addr = ++text;
+										expression(Cond);
+										*addr = (int)(text + 1);
+								} else if(token == Lor) {
+										mattch(Lor);
+										*++text = JNZ;
+										addr = ++text;
+										expression(Lan);
+										*addr = (int)(text + 1);
+										expr_type = INT;
+								} else if(token == Lan) {
+										mattch(Lan);
+										*++text = JZ;
+										addr = ++text;
+										expression(Or);
+										*addr = (int)(text + 1);
+										expr_type = INT;
+								} else if (token == Or) {
+										mattch(Or);
+										*++text = PUSH;
+										expression(Xor);
+										*++text = OR;
+										expr_type = INT;
+								} else if (token == Xor) {
+										mattch(Xor);
+										*++text = PUSH;
+										expression(And);
+										*++text = XOR;
+										expr_type = INT;
+								} else if (token == And) {
+										mattch(And);
+										*++text = PUSH;
+										expression(Eq);
+										*++text = AND;
+										expr_type = INT;
+								} else if (token == Eq) {
+										mattch(Eq);
+										*++text = PUSH;
+										expression(Ne);
+										*++text = EQ;
+										expr_type = INT;
+								} else if (token == Ne) {
+										mattch(Ne);
+										*++text = PUSH;
+										expression(Lt);
+										*++text = NE;
+										expr_type = INT;
+								} else if (token == Lt) {
+										mattch(Lt);
+										*++text = PUSH;
+										expression(Shl);
+										*++text = LT;
+										expr_type = INT;
+								} else if (token == Gt) {
+										mattch(Gt);
+										*++text = PUSH;
+										expression(Shl);
+										*++text = GT;
+										expr_type = INT;
+								} else if (token == Le) {
+										mattch(Le);
+										*++text = PUSH;
+										expression(Shl);
+										*++text = LE;
+										expr_type = INT;
+								} else if (token == Ge) {
+										mattch(Ge);
+										*++text = PUSH;
+										expression(Shl);
+										*++text = GE;
+										expr_type = INT;
+								} else if (token == Shl) {
+										mattch(Shl);
+										*++text = PUSH;
+										expression(Add);
+										*++text = SHL;
+										expr_type = INT;
+								} else if (token == Shr) {
+										mattch(Shr);
+										*++text = PUSH;
+										expression(Add);
+										*++text = SHR;
+										expr_type = INT;
+								} else if (token == Add) {
+										mattch(Add);
+										*++text = PUSH;
+										expression(Mul);
+
+										expr_type = tmp;
+										if (expr_type > PTR) {
+											*++text = PUSH;
+											*++text = IMM;
+											*++text = sizeof(int);
+											*++text = MUL;
+										}
+										*++text = ADD;
+								} else if (token == Sub) {
+										mattch(Sub);
+										*++text = PUSH;
+										expression(Mul);
+										if (tmp > PTR && tmp == expr_type) {
+											*++text = SUB;
+											*++text = PUSH;
+											*++text = IMM;
+											*++text = sizeof(int);
+											*++text = DIV;
+											expr_type = INT;
+										} else if (tmp > PTR) {
+											*++text = PUSH;
+											*++text = IMM;
+											*++text = sizeof(int);
+											*++text = MUL;
+											*++text = SUB;
+											expr_type = tmp;
+										} else {
+											*++text = SUB;
+											expr_type = tmp;
+										}
+								} else if (token == Mul) {
+										mattch(Mul);
+										*++text = PUSH;
+										expression(Inc);
+										*++text = MUL;
+										expr_type = tmp;
+								} else if (token == Div) {
+										mattch(Div);
+										*++text = PUSH;
+										expression(Inc);
+										*++text = DIV;
+										expr_type = tmp;
+								} else if (token == Mod) {
+										mattch(Mod);
+										*++text = PUSH;
+										expression(Inc);
+										*++text = MOD;
+										expr_type = tmp;
+								} else if (token == Inc || token == Dec) {
+										if (*text == LI) {
+											*text = PUSH;
+											*++text = LI;
+										} else if (*text == LC) {
+											*text = PUSH;
+											*++text = LC;
+										} else {
+											printf("%d: bad value in increment\n", line);
+											exit(-1);
+										}
+
+										*++text = PUSH;
+										*++text = IMM;
+										*++text = (expr_type > PTR) ? sizeof(int) : sizeof(char);
+										*++text = (token == Inc) ? ADD : SUB;
+										*++text = (expr_type == CHAR) ? SC : SI;
+										*++text = PUSH;
+										*++text = IMM;
+										*++text = (expr_type > PTR) ? sizeof(int) : sizeof(char);
+										*++text = (token == Inc) ? SUB : ADD;
+										mattch(token);
+								} else if (token == Brak) {
+										mattch(Brak);
+										*++text = PUSH;
+										expression(Assign);
+										mattch(']');
+
+										if (tmp > PTR) {
+											*++text = PUSH;
+											*++text = IMM;
+											*++text = sizeof(int);
+											*++text = MUL;
+										} else if (tmp < PTR) {
+											printf("%d: pointer type expected\n", line);
+											exit(-1);
+										}
+										expr_type = tmp - PTR;
+										*++text = ADD;
+										*++text = (expr_type == CHAR) ? LC : LI;
+									} else {
+										printf("%d: compiler error, token = %d\n", line, token);
+										exit(-1);
+								}
+						}
+				}
+		}
+
+		//enum解析
+		void enum_declaration() {
+				int i;
+				i = 0;
+				while (token != '}') {
+						if(token != Id){
+								printf("%d: bad enum declaration\n", line);
+								exit(-1);
+						}
+
 						next();
-						if (token != Num) {
-								printf("%d: bad enum num declaration\n", line);
+						if (token == Assign) {
+								next();
+								if (token != Num) {
+										printf("%d: bad enum num declaration\n", line);
 								exit(-1);
 						}
 						i = token_value;
@@ -276,7 +677,7 @@ void enum_declaration() {
 				}
 
 				current_id[Class] = Num;
-				current_id[Type] = Int;
+				current_id[Type] = INT;
 				current_id[Value] = i ++;
 
 				if(token == ',') {
@@ -329,7 +730,66 @@ void function_parameter() {
 
 //解析各种语句
 void statement() {
+		int *a, *b;
 
+		if (token == If) {
+				mattch(If);
+				mattch('(');
+				expression(Assign);
+				mattch(')');
+
+				* ++text = JZ;
+				b = ++ text;
+
+				statement();
+				if (token == Else) {
+						mattch(Else);
+
+						*b = (int)(text + 3);
+						* ++text = JMP;
+						b = ++ text;
+
+						statement();
+				}
+				*b = (int)(text + 1);
+		} else if (token == While) {
+				mattch(While);
+
+				a = text + 1;
+				mattch('(');
+				expression(Assign);
+				mattch(')');
+
+				* ++text = JZ;
+				b = ++ text;
+
+				statement();
+
+				* ++text = JMP;
+				* ++text = (int)a;
+				* b = (int)(text + 1);	
+		} else if(token == Return) {
+				mattch(Return);
+
+				if (token != ';') {
+						expression(Assign);
+				}
+
+				mattch(';');
+
+				*++ text = LEV;
+		} else if(token == '{') {
+				mattch('{');
+				while (token != '}') {
+						statement();
+				}
+				mattch('}');
+		} else if(token == ';') {
+				mattch(';');
+		} else {
+				expression(Assign);
+				mattch(';');
+		}
 }
 
 //解析函数体
@@ -428,11 +888,12 @@ void global_declaration() {
 		
 		while (token != ';' && token != '}') {
 				type = basetype;
-				while (token == 'Mul') {
+				while (token == Mul) {
 						mattch(Mul);
 						type = type + PTR;
 				}
 				if(token != Id) {
+						printf("%d %d\n", token, Id);
 						printf("%d: bad global declaration!\n", line);
 						exit(-1);
 				}
@@ -520,14 +981,65 @@ int eval() {
 		return 0;
 }
 
+#undef int
+
 int main(int argc, char **argv) {
 		int i, fd;
-
+		int *tmp;
 		argc --;
 		argv ++;
-
+		
 		poolsize = 256 * 1024;
 		line = 1;
+
+
+		if (!(text = old_text = malloc(poolsize))) {
+				printf("could not malloc(%d) for text area\n", poolsize);
+				return -1;
+		}
+
+		if (!(data = malloc(poolsize))) {
+				printf("could not malloc(%d) for data area\n", poolsize);
+				return -1;
+		}
+
+		if (!(stack = malloc(poolsize))) {
+				printf("could not malloc(%d) for stack area\n", poolsize);
+				return -1;
+		}
+		
+		if(!(symbols = malloc(poolsize))) {
+				printf("could not malloc(%d) for symbols area\n", poolsize);
+				return -1;
+		}
+
+		memset(text, 0, poolsize);
+		memset(data, 0, poolsize);
+		memset(stack, 0, poolsize);
+		memset(symbols, 0, poolsize);	
+		bp = sp = (int *)((int)stack + poolsize);
+		ax = 0;
+		src = "char else enum if int return sizeof while "
+		      "open read close printf malloc memset memcmp exit void main";
+
+		
+		i = Char;
+		while (i <= While) {
+				next();
+				current_id[Token] = i ++;
+		}
+		i = OPEN;
+		while (i <= EXIT) {
+				next();
+				current_id[Class] = Sys;
+				current_id[Type] = INT;
+				current_id[Value] = i ++;
+		}
+
+		next(); current_id[Token] = Char;
+		next(); idmain = current_id;
+
+
 		if ((fd = open(*argv, 0)) < 0) {
 				printf("could not open(%s)\n", *argv);
 				return -1;
@@ -546,40 +1058,19 @@ int main(int argc, char **argv) {
 		src[i] = 0;
 		close(fd);
 
-		if (!(text = old_text = malloc(poolsize))) {
-				printf("could not malloc(%d) for text area\n", poolsize);
-				return -1;
+		program();
+
+		if (!(pc = (int *)idmain[Value])) {
+				printf("main() not defined\n");
+				return -1;		    
 		}
 
-		if (!(data = malloc(poolsize))) {
-				printf("could not malloc(%d) for data area\n", poolsize);
-				return -1;
-		}
+		sp = (int *)((int)stack + poolsize);
+		*--sp = EXIT; // call exit if main returns
+		*--sp = PUSH; tmp = sp;
+		*--sp = argc;
+		*--sp = (int)argv;
+		*--sp = (int)tmp;
 
-		if (!(stack = malloc(poolsize))) {
-				printf("could not malloc(%d) for stack area\n", poolsize);
-				return -1;
-		}
-
-		memset(text, 0, poolsize);
-		memset(data, 0, poolsize);
-		memset(stack, 0, poolsize);
-
-		bp = sp = (int *)((int)stack + poolsize);
-		ax = 0;
-
-		i = 0;
-		text[i ++] = IMM;
-		text[i ++] = 10;
-		text[i ++] = PUSH;
-		text[i ++] = IMM;
-		text[i ++] = 20;
-		text[i ++] = ADD;
-		text[i ++] = PUSH;
-		text[i ++] = EXIT;
-
-		pc = text;
-		
-		//program();
 		return eval();
 }
