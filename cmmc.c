@@ -2,8 +2,6 @@
 #include <stdlib.h>
 #include <memory.h>
 #include <string.h>
-#include <sys/types.h>
-#include <time.h>
 
 #define int long long
 int token; //读入的token
@@ -103,15 +101,15 @@ void next() {
 						//解析字符串
 						last_pos = data;
 						while(*src != 0 && *src != token) {
-								token_value = *src ++;
+								token_value = *src++;
 								if(token_value == '\\') {
-										token_value = *src ++;
+										token_value = *src++;
 										if(token_value == 'n') {
 												token_value = '\n';
 										}		
 								}
 								if(token == '"') {
-										*data = token_value;
+										*data++ = token_value;
 								}
 						}
 						src ++;
